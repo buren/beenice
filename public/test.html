@@ -25,13 +25,9 @@
     </script>
   </head>
   <body>
-    <div id="map" style="height:300px;"></div>
+    <div id="beenice-map" style="height:300px;"></div>
     <br><br>
-    <div id="beenice-location-form">
-      <form action="#" method="post">
-        <input type="submit" name="submit" value="Submit current location" class="button">
-      </form>
-    </div>
+    <a href="#" id="beenice-action-button" class="button">Get location</a>
 
     <script type="text/javascript">
 
@@ -39,7 +35,8 @@
       REST CLIENT
     ********************************************************/
     (function(window) {
-      BASE_URL = 'https://beenice-app.herokuapp.com';
+      // BASE_URL = 'https://beenice-app.herokuapp.com';
+      BASE_URL = 'http://localhost:3003';
 
       function noop() {}
 
@@ -78,16 +75,108 @@
         }
       }
 
-      var Beenice = function(options) {
-        var self = this;
-        var opts = options || {};
+      var Beenice = {
+        getLocations: getLocations,
+        postLocation: postLocation,
+        getUserPosition: getUserPosition
+      };
 
-        self.getLocations = getLocations;
-        self.postLocation = postLocation;
-        self.getUserPosition = getUserPosition;
-      }
+      window.Beenice = Beenice;
+    })(window);
 
-      window.BeeniceClient = Beenice;
+    (function(window) {
+      var BeeniceMap = {
+        map: null,
+        _userDroppedArea: null,
+        init: function(mapId) {
+          var stockholm = { lat: 59.329323, lng: 18.068581 };
+          var id = mapId || console.error('BeeniceMap: Missing element id');
+
+          BeeniceMap.map = new google.maps.Map(document.getElementById(id), {
+            zoom: 4,
+            center: stockholm
+          });
+          BeeniceMap._initEventListners();
+        },
+        _initEventListners: function() {
+          // When the user clicks the map place a marker
+          google.maps.event.addListener(BeeniceMap.map, 'click', function(event) {
+            var location = {
+              lat: event.latLng.lat(),
+              long: event.latLng.lng()
+            };
+
+            BeeniceMap.placeUserLocation(location);
+          });
+        },
+        setUserDroppedArea: function(area) {
+          return BeeniceMap._userDroppedArea = area;
+        },
+        getUserDroppedArea: function() {
+          return BeeniceMap._userDroppedArea;
+        },
+        getUserDroppedLocation: function() {
+          return {
+            lat: BeeniceMap._userDroppedArea.marker.position.lat(),
+            long: BeeniceMap._userDroppedArea.marker.position.lng()
+          };
+        },
+        clearUserDroppedArea: function() {
+          var area = BeeniceMap.getUserDroppedArea();
+          if (!area) return;
+
+          area.circle.setMap(null);
+          area.marker.setMap(null);
+        },
+        placeUserLocation: function(location) {
+          BeeniceMap.clearUserDroppedArea();
+
+          BeeniceMap.centerMap(location);
+
+          if (BeeniceMap.getZoom() < 14) {
+            BeeniceMap.setZoom(14);
+          }
+          var area = BeeniceMap.setUserDroppedArea(BeeniceMap.addLocation(location));
+
+          return area;
+        },
+        centerMap: function(location) {
+          BeeniceMap.map.setCenter({ lat: location.lat, lng: location.long });
+        },
+        getZoom: function() {
+          return BeeniceMap.map.getZoom();
+        },
+        setZoom: function (zoom) {
+          BeeniceMap.map.setZoom(zoom);
+        },
+        addLocation: function(location) {
+          var map = BeeniceMap.map;
+          var latLng = {
+            lat: location.lat,
+            lng: location.long
+          };
+
+          var marker = new google.maps.Marker({
+            position: latLng,
+            map: map
+          });
+
+          var circle = new google.maps.Circle({
+            strokeColor: '#FF0000',
+            strokeOpacity: 0.6,
+            strokeWeight: 2,
+            fillColor: '#FF0000',
+            fillOpacity: 0.10,
+            map: map,
+            center: latLng,
+            radius: 200 // meters
+          });
+
+          return { marker: marker, circle: circle };
+        }
+      };
+
+      window.BeeniceMap = BeeniceMap;
     })(window);
 
 
@@ -95,64 +184,64 @@
       DOM APP
     ********************************************************/
 
-      var Beenice = new BeeniceClient();
-      var map;
+    $('#beenice-location-form form').submit(function(event) {
+      event.preventDefault();
 
-      function initBeeniceLocationsMap() {
-        var stockholm = { lat: 59.329323, lng: 18.068581 };
-
-        map = new google.maps.Map(document.getElementById('map'), {
-          zoom: 4,
-          center: stockholm
-        });
-
-        Beenice.getLocations({ size: 100 }, function(locations) {
-          var location, latLng;
-          for (var i = 0; i < locations.length; i++) {
-            addLocationToMap(map, locations[i]);
-          }
-        });
-      }
-
-      function centerMap(map, location) {
-        map.setCenter({ lat: location.lat, lng: location.long });
-      }
-
-      function setMapZoom(map, zoom) {
-        map.setZoom(zoom);
-      }
-
-      function addLocationToMap(map, location) {
-        var latLng = {
-          lat: location.lat,
-          lng: location.long
-        };
-
-        new google.maps.Marker({
-          position: latLng,
-          map: map
-        });
-      }
-
-      $('#beenice-location-form form').submit(function(event) {
-        event.preventDefault();
-
-        Beenice.getUserPosition(function(position) {
-          var data = {
-            lat: position.coords.latitude,
-            long: position.coords.longitude
-          };
-
-          Beenice.postLocation(data, function(location) {
-            addLocationToMap(map, location);
-            centerMap(map, location);
-            setMapZoom(map, 12);
-          });
-        });
+      var data = BeeniceMap.getUserDroppedLocation();
+      Beenice.postLocation(data, function(location) {
+        BeeniceMap.addLocation(location);
       });
 
+      // Beenice.getUserPosition(function(position) {
+      //   var data = {
+      //     lat: position.coords.latitude,
+      //     long: position.coords.longitude
+      //   };
+      //   Beenice.postLocation(data, function(location) {
+      //     BeeniceMap.addLocation(location);
+      //     BeeniceMap.centerMap(location);
+      //     BeeniceMap.setZoom(12);
+      //   });
+      // });
+    });
+
+    $('#beenice-action-button').click(function(event) {
+      event.preventDefault();
+
+      var $input = $(this);
+      $input.text('Loading..');
+
+      Beenice.getUserPosition(function(position) {
+        var location = {
+          lat: position.coords.latitude,
+          long: position.coords.longitude
+        };
+        BeeniceMap.placeUserLocation(location);
+
+        // Transform the button to a submit location button
+        $input.text('Submit');
+        $input.off('click');
+        $input.click(function(event) {
+          var data = BeeniceMap.getUserDroppedLocation();
+          Beenice.postLocation(data, function(location) {
+            BeeniceMap.addLocation(location);
+          });
+        });
+
+      });
+    });
+
+    function initBeeniceApp() {
+      BeeniceMap.init('beenice-map');
+      Beenice.getLocations({ size: 100 }, function(locations) {
+        var location, latLng;
+        for (var i = 0; i < locations.length; i++) {
+          BeeniceMap.addLocation(locations[i]);
+        }
+      });
+    }
     </script>
 
-    <script async defer src="https://maps.googleapis.com/maps/api/js?&key=AIzaSyAQ-Iu3YFs_qXky2rAZNicY5gh6ampBq-M&callback=initBeeniceLocationsMap"></script>
+    <script async defer src="https://maps.googleapis.com/maps/api/js?&key=AIzaSyAQ-Iu3YFs_qXky2rAZNicY5gh6ampBq-M&callback=initBeeniceApp"></script>
   </body>
 </html>

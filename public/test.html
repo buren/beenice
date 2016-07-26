@@ -27,8 +27,8 @@
   <body>
     <div id="beenice-map" style="height:300px;"></div>
     <br>
-    <a href="#" id="beenice-action-button" class="button">Get location</a>
-    <a href="#" id="beenice-submit-button" class="button">Submit</a>
+    <a href="#" id="beenice-get-location" class="button">Get location</a>
+    <a href="#" id="beenice-submit-location" class="button">Submit</a>
     <script type="text/javascript">
 
     /********************************************************
@@ -186,11 +186,10 @@
       DOM APP
     ********************************************************/
 
-    $('#beenice-action-button').click(function(event) {
+    $('#beenice-get-location').click(function(event) {
       event.preventDefault();
 
       var $button = $(this);
-      var previousText = $button.text();
       $button.text('Loading..');
 
       Beenice.getUserPosition(function(position) {
@@ -199,39 +198,35 @@
           long: position.coords.longitude
         };
         BeeniceMap.placeUserLocation(location);
-        $button.text(previousText);
+        $button.text('Get location');
       });
     });
 
-    $('#beenice-submit-button').click(function(event) {
+    $('#beenice-submit-location').click(function(event) {
       event.preventDefault();
 
       var $button = $(this);
       var previousText = $button.text();
 
-      var data = BeeniceMap.getUserDroppedLocation();
-      if (data === null) {
+      var location = BeeniceMap.getUserDroppedLocation();
+      if (location === null) {
         $button.text('Pick a location..');
-
-        setTimeout(function() {
-          $button.text(previousText);
-        }, 4000);
       } else {
-        Beenice.postLocation(data, function(location) {
+        Beenice.postLocation(location, function(location) {
           BeeniceMap.addLocation(location);
         });
 
+        BeeniceMap.centerMap(location);
         $button.text('Thank you!');
-        setTimeout(function() {
-          $button.text(previousText);
-        }, 4000);
       }
+      setTimeout(function() {
+        $button.text('Submit');
+      }, 4000);
     });
 
     function initBeeniceApp() {
       BeeniceMap.init('beenice-map');
       Beenice.getLocations({ size: 100 }, function(locations) {
-        var location, latLng;
         for (var i = 0; i < locations.length; i++) {
           BeeniceMap.addLocation(locations[i]);
         }

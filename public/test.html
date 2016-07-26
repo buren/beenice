@@ -26,9 +26,9 @@
   </head>
   <body>
     <div id="beenice-map" style="height:300px;"></div>
-    <br><br>
+    <br>
     <a href="#" id="beenice-action-button" class="button">Get location</a>
-
+    <a href="#" id="beenice-submit-button" class="button">Submit</a>
     <script type="text/javascript">
 
     /********************************************************
@@ -92,7 +92,7 @@
           var id = mapId || console.error('BeeniceMap: Missing element id');
 
           BeeniceMap.map = new google.maps.Map(document.getElementById(id), {
-            zoom: 4,
+            zoom: 7,
             center: stockholm
           });
           BeeniceMap._initEventListners();
@@ -115,9 +115,12 @@
           return BeeniceMap._userDroppedArea;
         },
         getUserDroppedLocation: function() {
+          var area = BeeniceMap.getUserDroppedArea();
+          if (!area) return null;
+
           return {
-            lat: BeeniceMap._userDroppedArea.marker.position.lat(),
-            long: BeeniceMap._userDroppedArea.marker.position.lng()
+            lat: area.marker.position.lat(),
+            long: area.marker.position.lng()
           };
         },
         clearUserDroppedArea: function() {
@@ -183,32 +186,12 @@
       DOM APP
     ********************************************************/
 
-    $('#beenice-location-form form').submit(function(event) {
-      event.preventDefault();
-
-      var data = BeeniceMap.getUserDroppedLocation();
-      Beenice.postLocation(data, function(location) {
-        BeeniceMap.addLocation(location);
-      });
-
-      // Beenice.getUserPosition(function(position) {
-      //   var data = {
-      //     lat: position.coords.latitude,
-      //     long: position.coords.longitude
-      //   };
-      //   Beenice.postLocation(data, function(location) {
-      //     BeeniceMap.addLocation(location);
-      //     BeeniceMap.centerMap(location);
-      //     BeeniceMap.setZoom(12);
-      //   });
-      // });
-    });
-
     $('#beenice-action-button').click(function(event) {
       event.preventDefault();
 
-      var $input = $(this);
-      $input.text('Loading..');
+      var $button = $(this);
+      var previousText = $button.text();
+      $button.text('Loading..');
 
       Beenice.getUserPosition(function(position) {
         var location = {
@@ -216,18 +199,33 @@
           long: position.coords.longitude
         };
         BeeniceMap.placeUserLocation(location);
+        $button.text(previousText);
+      });
+    });
 
-        // Transform the button to a submit location button
-        $input.text('Submit');
-        $input.off('click');
-        $input.click(function(event) {
-          var data = BeeniceMap.getUserDroppedLocation();
-          Beenice.postLocation(data, function(location) {
-            BeeniceMap.addLocation(location);
-          });
+    $('#beenice-submit-button').click(function(event) {
+      event.preventDefault();
+
+      var $button = $(this);
+      var previousText = $button.text();
+
+      var data = BeeniceMap.getUserDroppedLocation();
+      if (data === null) {
+        $button.text('Pick a location..');
+
+        setTimeout(function() {
+          $button.text(previousText);
+        }, 4000);
+      } else {
+        Beenice.postLocation(data, function(location) {
+          BeeniceMap.addLocation(location);
         });
 
-      });
+        $button.text('Thank you!');
+        setTimeout(function() {
+          $button.text(previousText);
+        }, 4000);
+      }
     });
 
     function initBeeniceApp() {
